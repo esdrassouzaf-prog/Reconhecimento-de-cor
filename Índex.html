@@ -1,0 +1,652 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>ColorMatch AI - Análise de Compatibilidade de Cores</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <link href="https://fonts.googleapis.com/css2?family=Space+Grotesk:wght@300;400;500;600;700&display=swap" rel="stylesheet">
+    <style>
+        * {
+            font-family: 'Space Grotesk', sans-serif;
+        }
+        
+        .gradient-bg {
+            background: linear-gradient(135deg, #1a1a2e 0%, #16213e 50%, #0f3460 100%);
+        }
+        
+        .glass-panel {
+            background: rgba(255, 255, 255, 0.05);
+            backdrop-filter: blur(10px);
+            border: 1px solid rgba(255, 255, 255, 0.1);
+        }
+        
+        .upload-zone {
+            background: rgba(255, 255, 255, 0.03);
+            border: 2px dashed rgba(255, 255, 255, 0.2);
+            transition: all 0.3s ease;
+        }
+        
+        .upload-zone:hover, .upload-zone.dragover {
+            background: rgba(255, 255, 255, 0.08);
+            border-color: #e94560;
+            transform: translateY(-2px);
+        }
+        
+        .color-bar {
+            height: 60px;
+            border-radius: 8px;
+            position: relative;
+            overflow: hidden;
+            box-shadow: 0 4px 15px rgba(0,0,0,0.3);
+        }
+        
+        .color-segment {
+            height: 100%;
+            float: left;
+            transition: all 0.3s ease;
+            position: relative;
+        }
+        
+        .color-segment:hover {
+            transform: scaleY(1.1);
+            z-index: 10;
+            box-shadow: 0 0 20px rgba(255,255,255,0.3);
+        }
+        
+        .compatibility-ring {
+            position: relative;
+            width: 200px;
+            height: 200px;
+        }
+        
+        .compatibility-ring svg {
+            transform: rotate(-90deg);
+        }
+        
+        .compatibility-ring circle {
+            fill: none;
+            stroke-width: 8;
+        }
+        
+        .compatibility-ring .bg {
+            stroke: rgba(255,255,255,0.1);
+        }
+        
+        .compatibility-ring .progress {
+            stroke: #e94560;
+            stroke-linecap: round;
+            transition: stroke-dashoffset 1s ease;
+            filter: drop-shadow(0 0 10px #e94560);
+        }
+        
+        .percentage-text {
+            position: absolute;
+            top: 50%;
+            left: 50%;
+            transform: translate(-50%, -50%);
+            font-size: 3rem;
+            font-weight: 700;
+            color: white;
+            text-shadow: 0 0 20px rgba(233, 69, 96, 0.5);
+        }
+        
+        .analysis-card {
+            background: linear-gradient(135deg, rgba(233, 69, 96, 0.1) 0%, rgba(15, 52, 96, 0.1) 100%);
+            border: 1px solid rgba(233, 69, 96, 0.3);
+        }
+        
+        @keyframes pulse-glow {
+            0%, 100% { box-shadow: 0 0 20px rgba(233, 69, 96, 0.3); }
+            50% { box-shadow: 0 0 40px rgba(233, 69, 96, 0.6); }
+        }
+        
+        .analyzing {
+            animation: pulse-glow 1.5s infinite;
+        }
+        
+        .hidden-input {
+            display: none;
+        }
+        
+        .preview-image {
+            max-height: 200px;
+            object-fit: cover;
+            border-radius: 8px;
+            box-shadow: 0 4px 20px rgba(0,0,0,0.4);
+        }
+        
+        .harmony-badge {
+            display: inline-flex;
+            align-items: center;
+            gap: 8px;
+            padding: 8px 16px;
+            border-radius: 20px;
+            font-weight: 600;
+            font-size: 0.9rem;
+        }
+    </style>
+</head>
+<body class="gradient-bg min-h-screen text-white p-4 md:p-8">
+    <div class="max-w-6xl mx-auto">
+        <!-- Header -->
+        <header class="text-center mb-12">
+            <h1 class="text-5xl md:text-6xl font-bold mb-4 bg-clip-text text-transparent bg-gradient-to-r from-pink-500 via-purple-500 to-indigo-500">
+                ColorMatch AI
+            </h1>
+            <p class="text-gray-400 text-lg">Análise avançada de compatibilidade cromática entre imagens</p>
+        </header>
+
+        <!-- Upload Section -->
+        <div class="grid md:grid-cols-2 gap-8 mb-12">
+            <!-- Image 1 -->
+            <div class="glass-panel rounded-2xl p-6">
+                <h3 class="text-xl font-semibold mb-4 flex items-center gap-2">
+                    <span class="w-8 h-8 rounded-full bg-pink-500 flex items-center justify-center text-sm">1</span>
+                    Primeira Imagem
+                </h3>
+                <div class="upload-zone rounded-xl p-8 text-center cursor-pointer" onclick="document.getElementById('file1').click()" id="dropZone1">
+                    <input type="file" id="file1" class="hidden-input" accept="image/*" onchange="handleImageUpload(event, 1)">
+                    <div id="preview1" class="hidden">
+                        <img id="img1" class="preview-image mx-auto mb-4" alt="Preview 1">
+                        <button onclick="event.stopPropagation(); clearImage(1)" class="text-red-400 hover:text-red-300 text-sm underline">Remover</button>
+                    </div>
+                    <div id="placeholder1" class="text-gray-400">
+                        <svg class="w-12 h-12 mx-auto mb-3 opacity-50" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 16l4.586-4.586a2 2 0 012.828 0L16 16m-2-2l1.586-1.586a2 2 0 012.828 0L20 14m-6-6h.01M6 20h12a2 2 0 002-2V6a2 2 0 00-2-2H6a2 2 0 00-2 2v12a2 2 0 002 2z"></path>
+                        </svg>
+                        <p>Clique ou arraste uma imagem</p>
+                    </div>
+                </div>
+                <div id="palette1" class="mt-4 hidden">
+                    <p class="text-sm text-gray-400 mb-2">Paleta dominante:</p>
+                    <div class="color-bar" id="colorBar1"></div>
+                </div>
+            </div>
+
+            <!-- Image 2 -->
+            <div class="glass-panel rounded-2xl p-6">
+                <h3 class="text-xl font-semibold mb-4 flex items-center gap-2">
+                    <span class="w-8 h-8 rounded-full bg-indigo-500 flex items-center justify-center text-sm">2</span>
+                    Segunda Imagem
+                </h3>
+                <div class="upload-zone rounded-xl p-8 text-center cursor-pointer" onclick="document.getElementById('file2').click()" id="dropZone2">
+                    <input type="file" id="file2" class="hidden-input" accept="image/*" onchange="handleImageUpload(event, 2)">
+                    <div id="preview2" class="hidden">
+                        <img id="img2" class="preview-image mx-auto mb-4" alt="Preview 2">
+                        <button onclick="event.stopPropagation(); clearImage(2)" class="text-red-400 hover:text-red-300 text-sm underline">Remover</button>
+                    </div>
+                    <div id="placeholder2" class="text-gray-400">
+                        <svg class="w-12 h-12 mx-auto mb-3 opacity-50" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 16l4.586-4.586a2 2 0 012.828 0L16 16m-2-2l1.586-1.586a2 2 0 012.828 0L20 14m-6-6h.01M6 20h12a2 2 0 002-2V6a2 2 0 00-2-2H6a2 2 0 00-2 2v12a2 2 0 002 2z"></path>
+                        </svg>
+                        <p>Clique ou arraste uma imagem</p>
+                    </div>
+                </div>
+                <div id="palette2" class="mt-4 hidden">
+                    <p class="text-sm text-gray-400 mb-2">Paleta dominante:</p>
+                    <div class="color-bar" id="colorBar2"></div>
+                </div>
+            </div>
+        </div>
+
+        <!-- Analyze Button -->
+        <div class="text-center mb-12">
+            <button id="analyzeBtn" onclick="analyzeColors()" disabled 
+                class="px-12 py-4 bg-gradient-to-r from-pink-600 to-purple-600 rounded-full font-bold text-lg shadow-lg transform transition hover:scale-105 disabled:opacity-50 disabled:cursor-not-allowed disabled:hover:scale-100">
+                Analisar Compatibilidade
+            </button>
+        </div>
+
+        <!-- Results Section -->
+        <div id="results" class="hidden">
+            <div class="glass-panel rounded-2xl p-8 mb-8">
+                <div class="flex flex-col md:flex-row items-center justify-center gap-12">
+                    <!-- Compatibility Score -->
+                    <div class="compatibility-ring">
+                        <svg width="200" height="200">
+                            <circle class="bg" cx="100" cy="100" r="90"></circle>
+                            <circle class="progress" id="progressCircle" cx="100" cy="100" r="90" 
+                                stroke-dasharray="565.48" stroke-dashoffset="565.48"></circle>
+                        </svg>
+                        <div class="percentage-text">
+                            <span id="percentageValue">0</span>%
+                        </div>
+                    </div>
+
+                    <!-- Analysis Details -->
+                    <div class="flex-1 max-w-md">
+                        <h2 class="text-2xl font-bold mb-4">Resultado da Análise</h2>
+                        <div id="harmonyType" class="harmony-badge mb-4"></div>
+                        <p id="analysisText" class="text-gray-300 leading-relaxed"></p>
+                        
+                        <div class="mt-6 grid grid-cols-2 gap-4">
+                            <div class="analysis-card rounded-lg p-4">
+                                <p class="text-sm text-gray-400">Contraste</p>
+                                <p id="contrastScore" class="text-xl font-bold text-pink-400">--</p>
+                            </div>
+                            <div class="analysis-card rounded-lg p-4">
+                                <p class="text-sm text-gray-400">Harmonia</p>
+                                <p id="harmonyScore" class="text-xl font-bold text-purple-400">--</p>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Color Comparison -->
+            <div class="glass-panel rounded-2xl p-8">
+                <h3 class="text-xl font-bold mb-6">Comparação Detalhada de Cores</h3>
+                <div class="grid md:grid-cols-2 gap-8">
+                    <div>
+                        <h4 class="text-sm font-semibold text-gray-400 mb-3 uppercase tracking-wider">Imagem 1 - Tons Principais</h4>
+                        <div id="detailedPalette1" class="space-y-2"></div>
+                    </div>
+                    <div>
+                        <h4 class="text-sm font-semibold text-gray-400 mb-3 uppercase tracking-wider">Imagem 2 - Tons Principais</h4>
+                        <div id="detailedPalette2" class="space-y-2"></div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <canvas id="canvas" class="hidden"></canvas>
+
+    <script>
+        let imageData1 = null;
+        let imageData2 = null;
+        let palette1 = [];
+        let palette2 = [];
+
+        // Drag and drop handlers
+        ['dropZone1', 'dropZone2'].forEach((id, index) => {
+            const zone = document.getElementById(id);
+            zone.addEventListener('dragover', (e) => {
+                e.preventDefault();
+                zone.classList.add('dragover');
+            });
+            zone.addEventListener('dragleave', () => {
+                zone.classList.remove('dragover');
+            });
+            zone.addEventListener('drop', (e) => {
+                e.preventDefault();
+                zone.classList.remove('dragover');
+                const file = e.dataTransfer.files[0];
+                if (file && file.type.startsWith('image/')) {
+                    handleFile(file, index + 1);
+                }
+            });
+        });
+
+        function handleImageUpload(event, num) {
+            const file = event.target.files[0];
+            if (file) handleFile(file, num);
+        }
+
+        function handleFile(file, num) {
+            const reader = new FileReader();
+            reader.onload = (e) => {
+                const img = document.getElementById(`img${num}`);
+                img.src = e.target.result;
+                img.onload = () => {
+                    extractColors(img, num);
+                };
+                
+                document.getElementById(`preview${num}`).classList.remove('hidden');
+                document.getElementById(`placeholder${num}`).classList.add('hidden');
+                
+                if (num === 1) imageData1 = img;
+                else imageData2 = img;
+                
+                checkReady();
+            };
+            reader.readAsDataURL(file);
+        }
+
+        function clearImage(num) {
+            document.getElementById(`file${num}`).value = '';
+            document.getElementById(`preview${num}`).classList.add('hidden');
+            document.getElementById(`placeholder${num}`).classList.remove('hidden');
+            document.getElementById(`palette${num}`).classList.add('hidden');
+            
+            if (num === 1) {
+                imageData1 = null;
+                palette1 = [];
+            } else {
+                imageData2 = null;
+                palette2 = [];
+            }
+            
+            document.getElementById('results').classList.add('hidden');
+            checkReady();
+        }
+
+        function checkReady() {
+            const btn = document.getElementById('analyzeBtn');
+            btn.disabled = !(imageData1 && imageData2);
+        }
+
+        function extractColors(img, num) {
+            const canvas = document.getElementById('canvas');
+            const ctx = canvas.getContext('2d');
+            
+            // Resize for performance
+            const scale = Math.min(1, 150 / Math.max(img.width, img.height));
+            canvas.width = img.width * scale;
+            canvas.height = img.height * scale;
+            
+            ctx.drawImage(img, 0, 0, canvas.width, canvas.height);
+            
+            const imageData = ctx.getImageData(0, 0, canvas.width, canvas.height);
+            const pixels = imageData.data;
+            
+            // Quantize colors
+            const colorMap = {};
+            const pixelCount = pixels.length / 4;
+            const sampleRate = Math.max(1, Math.floor(pixelCount / 10000));
+            
+            for (let i = 0; i < pixels.length; i += 4 * sampleRate) {
+                const r = Math.round(pixels[i] / 32) * 32;
+                const g = Math.round(pixels[i + 1] / 32) * 32;
+                const b = Math.round(pixels[i + 2] / 32) * 32;
+                const rgb = `${r},${g},${b}`;
+                
+                if (!colorMap[rgb]) colorMap[rgb] = 0;
+                colorMap[rgb]++;
+            }
+            
+            // Get top colors
+            const sortedColors = Object.entries(colorMap)
+                .sort((a, b) => b[1] - a[1])
+                .slice(0, 5)
+                .map(([color, count]) => {
+                    const [r, g, b] = color.split(',').map(Number);
+                    return { r, g, b, count, hex: rgbToHex(r, g, b) };
+                });
+            
+            if (num === 1) palette1 = sortedColors;
+            else palette2 = sortedColors;
+            
+            displayPalette(sortedColors, num);
+        }
+
+        function rgbToHex(r, g, b) {
+            return '#' + [r, g, b].map(x => {
+                const hex = x.toString(16);
+                return hex.length === 1 ? '0' + hex : hex;
+            }).join('');
+        }
+
+        function displayPalette(colors, num) {
+            const bar = document.getElementById(`colorBar${num}`);
+            const detailedContainer = document.getElementById(`detailedPalette${num}`);
+            
+            bar.innerHTML = '';
+            detailedContainer.innerHTML = '';
+            
+            const total = colors.reduce((sum, c) => sum + c.count, 0);
+            
+            colors.forEach((color, index) => {
+                const percentage = (color.count / total * 100).toFixed(1);
+                const width = Math.max(percentage, 10); // Minimum 10% for visibility
+                
+                // Bar segment
+                const segment = document.createElement('div');
+                segment.className = 'color-segment';
+                segment.style.width = width + '%';
+                segment.style.backgroundColor = color.hex;
+                segment.title = `${color.hex} - ${percentage}%`;
+                bar.appendChild(segment);
+                
+                // Detailed view
+                const detail = document.createElement('div');
+                detail.className = 'flex items-center gap-3 p-2 rounded hover:bg-white/5 transition';
+                detail.innerHTML = `
+                    <div class="w-12 h-12 rounded-lg shadow-lg" style="background-color: ${color.hex}"></div>
+                    <div class="flex-1">
+                        <p class="font-mono text-sm font-bold">${color.hex.toUpperCase()}</p>
+                        <p class="text-xs text-gray-400">RGB(${color.r}, ${color.g}, ${color.b})</p>
+                    </div>
+                    <div class="text-right">
+                        <p class="text-sm font-bold text-pink-400">${percentage}%</p>
+                        <p class="text-xs text-gray-500">dominância</p>
+                    </div>
+                `;
+                detailedContainer.appendChild(detail);
+            });
+            
+            document.getElementById(`palette${num}`).classList.remove('hidden');
+        }
+
+        function analyzeColors() {
+            if (!palette1.length || !palette2.length) return;
+            
+            const btn = document.getElementById('analyzeBtn');
+            btn.classList.add('analyzing');
+            btn.textContent = 'Analisando...';
+            
+            setTimeout(() => {
+                const result = calculateCompatibility();
+                displayResults(result);
+                
+                btn.classList.remove('analyzing');
+                btn.textContent = 'Analisar Compatibilidade';
+            }, 800);
+        }
+
+        function calculateCompatibility() {
+            let totalScore = 0;
+            let comparisons = 0;
+            
+            // Compare each color in palette1 with each in palette2
+            for (let c1 of palette1) {
+                for (let c2 of palette2) {
+                    const score = compareTwoColors(c1, c2);
+                    totalScore += score;
+                    comparisons++;
+                }
+            }
+            
+            const averageScore = totalScore / comparisons;
+            
+            // Calculate additional metrics
+            const contrast = calculateAverageContrast();
+            const harmony = calculateHarmonyScore();
+            
+            // Weighted final score
+            const finalScore = Math.round((averageScore * 0.5) + (contrast * 0.25) + (harmony * 0.25));
+            
+            return {
+                score: Math.min(100, Math.max(0, finalScore)),
+                contrast: Math.round(contrast),
+                harmony: Math.round(harmony),
+                details: getCompatibilityDescription(finalScore)
+            };
+        }
+
+        function compareTwoColors(c1, c2) {
+            // Convert to HSL for better comparison
+            const hsl1 = rgbToHsl(c1.r, c1.g, c1.b);
+            const hsl2 = rgbToHsl(c2.r, c2.g, c2.b);
+            
+            // Hue similarity (0-100)
+            let hueDiff = Math.abs(hsl1.h - hsl2.h);
+            if (hueDiff > 180) hueDiff = 360 - hueDiff;
+            const hueScore = 100 - (hueDiff / 1.8);
+            
+            // Saturation similarity
+            const satDiff = Math.abs(hsl1.s - hsl2.s);
+            const satScore = 100 - satDiff;
+            
+            // Lightness similarity
+            const lightDiff = Math.abs(hsl1.l - hsl2.l);
+            const lightScore = 100 - lightDiff;
+            
+            // Check for complementary colors (high harmony)
+            let complementaryBonus = 0;
+            if (hueDiff >= 150 && hueDiff <= 210) {
+                complementaryBonus = 20;
+            }
+            
+            // Check for analogous colors
+            let analogousBonus = 0;
+            if (hueDiff <= 30) {
+                analogousBonus = 15;
+            }
+            
+            return Math.min(100, (hueScore * 0.4) + (satScore * 0.3) + (lightScore * 0.3) + complementaryBonus + analogousBonus);
+        }
+
+        function rgbToHsl(r, g, b) {
+            r /= 255;
+            g /= 255;
+            b /= 255;
+            
+            const max = Math.max(r, g, b);
+            const min = Math.min(r, g, b);
+            let h, s, l = (max + min) / 2;
+            
+            if (max === min) {
+                h = s = 0;
+            } else {
+                const d = max - min;
+                s = l > 0.5 ? d / (2 - max - min) : d / (max + min);
+                
+                switch (max) {
+                    case r: h = ((g - b) / d + (g < b ? 6 : 0)) / 6; break;
+                    case g: h = ((b - r) / d + 2) / 6; break;
+                    case b: h = ((r - g) / d + 4) / 6; break;
+                }
+            }
+            
+            return {
+                h: h * 360,
+                s: s * 100,
+                l: l * 100
+            };
+        }
+
+        function calculateAverageContrast() {
+            let totalContrast = 0;
+            let count = 0;
+            
+            for (let c1 of palette1) {
+                for (let c2 of palette2) {
+                    const lum1 = (0.299 * c1.r + 0.587 * c1.g + 0.114 * c1.b);
+                    const lum2 = (0.299 * c2.r + 0.587 * c2.g + 0.114 * c2.b);
+                    const contrast = Math.abs(lum1 - lum2) / 255 * 100;
+                    totalContrast += contrast;
+                    count++;
+                }
+            }
+            
+            return totalContrast / count;
+        }
+
+        function calculateHarmonyScore() {
+            // Check color wheel relationships
+            let harmonyPoints = 0;
+            let checks = 0;
+            
+            for (let c1 of palette1) {
+                for (let c2 of palette2) {
+                    const hsl1 = rgbToHsl(c1.r, c1.g, c1.b);
+                    const hsl2 = rgbToHsl(c2.r, c2.g, c2.b);
+                    
+                    let hueDiff = Math.abs(hsl1.h - hsl2.h);
+                    if (hueDiff > 180) hueDiff = 360 - hueDiff;
+                    
+                    // Complementary (opposite)
+                    if (hueDiff >= 170 && hueDiff <= 190) harmonyPoints += 100;
+                    // Analogous (close)
+                    else if (hueDiff <= 30) harmonyPoints += 80;
+                    // Triadic (120 apart)
+                    else if (hueDiff >= 110 && hueDiff <= 130) harmonyPoints += 70;
+                    // Split complementary
+                    else if (hueDiff >= 140 && hueDiff <= 160) harmonyPoints += 60;
+                    
+                    checks++;
+                }
+            }
+            
+            return harmonyPoints / checks;
+        }
+
+        function getCompatibilityDescription(score) {
+            if (score >= 90) return {
+                type: 'Excelente',
+                icon: '✨',
+                color: 'bg-green-500',
+                text: 'As imagens possuem uma compatibilidade excepcional. As paletas de cores se complementam perfeitamente, criando uma harmonia visual sofisticada. Ideal para uso em conjunto em projetos de design.'
+            };
+            if (score >= 75) return {
+                type: 'Muito Bom',
+                icon: '🎨',
+                color: 'bg-blue-500',
+                text: 'Compatibilidade muito boa entre as imagens. Existe uma relação cromática forte que permite combinações elegantes. Pequenos ajustes podem tornar a união perfeita.'
+            };
+            if (score >= 60) return {
+                type: 'Bom',
+                icon: '👍',
+                color: 'bg-yellow-500',
+                text: 'As imagens possuem uma compatibilidade razoável. Há elementos cromáticos que funcionam bem juntos, embora alguns contrastes possam precisar de atenção.'
+            };
+            if (score >= 40) return {
+                type: 'Regular',
+                icon: '⚠️',
+                color: 'bg-orange-500',
+                text: 'Compatibilidade moderada. As paletas têm diferenças significativas que podem criar desconforto visual se usadas sem cuidado. Considere ajustes de saturação ou temperatura.'
+            };
+            return {
+                type: 'Baixa',
+                icon: '💥',
+                color: 'bg-red-500',
+                text: 'As imagens possuem baixa compatibilidade cromática. As paletas competem entre si ou criam conflitos visuais. Recomenda-se tratamento de cor antes de combiná-las.'
+            };
+        }
+
+        function displayResults(result) {
+            document.getElementById('results').classList.remove('hidden');
+            
+            // Animate percentage
+            const percentageEl = document.getElementById('percentageValue');
+            const circle = document.getElementById('progressCircle');
+            const circumference = 2 * Math.PI * 90;
+            const offset = circumference - (result.score / 100) * circumference;
+            
+            circle.style.strokeDashoffset = offset;
+            
+            // Color based on score
+            if (result.score >= 75) circle.style.stroke = '#10b981';
+            else if (result.score >= 50) circle.style.stroke = '#f59e0b';
+            else circle.style.stroke = '#ef4444';
+            
+            // Animate number
+            let current = 0;
+            const increment = result.score / 30;
+            const timer = setInterval(() => {
+                current += increment;
+                if (current >= result.score) {
+                    current = result.score;
+                    clearInterval(timer);
+                }
+                percentageEl.textContent = Math.round(current);
+            }, 30);
+            
+            // Update details
+            const desc = result.details;
+            document.getElementById('harmonyType').innerHTML = `
+                <span class="text-2xl">${desc.icon}</span>
+                <span class="${desc.color} px-3 py-1 rounded-full text-white text-sm">${desc.type}</span>
+            `;
+            document.getElementById('analysisText').textContent = desc.text;
+            document.getElementById('contrastScore').textContent = result.contrast + '%';
+            document.getElementById('harmonyScore').textContent = result.harmony + '%';
+            
+            // Scroll to results
+            document.getElementById('results').scrollIntoView({ behavior: 'smooth', block: 'nearest' });
+        }
+    </script>
+</body>
+</html>
